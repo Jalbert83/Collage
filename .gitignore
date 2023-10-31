@@ -1,0 +1,7 @@
+*.png
+*.jpg
+*.jpeg
+.idea
+Aitor/
+faces_discarded
+__pycache__/
