@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from numpy.linalg import norm
-from Hexagon import get_hexagon_reg
+from hexagon import get_hexagon_reg
 
 
 def BrightSelect(MaskSum, df, range, var):
@@ -18,7 +18,7 @@ def BrightSelect(MaskSum, df, range, var):
 imsize = 128
 MaskSizeX = 8000#int(np.floor(20*imsize))
 MaskSizeY = 10666#int(np.floor(30*imsize))
-dir_path = r'C:\Repos\GFPGAN\Aitoro\cropped_faces'#r'.\cropped_faces'
+dir_path = r'.\croped_images'
 df = pd.DataFrame()
 i= 0
 
@@ -40,7 +40,7 @@ for path in os.listdir(dir_path):
 BrightRange = [np.min(df.bright), np.max(df.bright)]
 BrightVar = 40
 
-mask = cv2.imread('MaskAitorrCapaz.jpg')
+mask = cv2.imread('mask.jpg')
 mask = cv2.resize(mask, (MaskSizeX, MaskSizeY))
 res = np.zeros(mask.shape, dtype=np.uint8)
 
@@ -90,7 +90,7 @@ c.hist("bright")
 df.hist('bright')
 Maskdf.hist('bright')
 plt.figure()
-cv2.imwrite("resAitordilPoster3.jpg", res[:,:,::-1])
+cv2.imwrite("result.jpg", res[:,:,::-1])
 plt.imshow(res)
 
 plt.figure()
