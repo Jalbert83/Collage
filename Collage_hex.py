@@ -4,20 +4,21 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from numpy.linalg import norm
-from hexagon import get_hexagon_reg
+from hexagon import get_hexagon_reg, get_hexagon_mask_coordinates
+
+'''
+Returns a selection of images (within the data frame) filtered by brightness taking into account the mask brightness
+'''
+def bright_select(mask_sum, df, range, tolerance):
+    amp = range[1]-range[0]-tolerance
+    center = mask_sum*amp+range[0]+tolerance//2
+    selection = df.loc[df.bright > center-tolerance//2-2].loc[df.bright <= center+tolerance//2+2]
+    return selection
 
 
-def BrightSelect(MaskSum, df, range, var):
-    Amp = range[1]-range[0]-var
-    cenTb = MaskSum*Amp+range[0]+var//2
-    c = df.loc[df.bright > cenTb-var//2-2].loc[df.bright <= cenTb+var//2+2]
-
-    return c
-
-
-imsize = 128
-MaskSizeX = 8000#int(np.floor(20*imsize))
-MaskSizeY = 10666#int(np.floor(30*imsize))
+im_size = 128
+mask_size_x = int(np.floor(20*im_size))#8000
+mask_size_y = int(np.floor(30*im_size))#10666
 dir_path = r'.\croped_images'
 df = pd.DataFrame()
 i= 0
@@ -33,52 +34,37 @@ for path in os.listdir(dir_path):
         df.loc[i, 'bright'] = bright
         df.loc[i, 'used'] = 0
         i+=1
-        #plt.imshow(im)
-        #plt.show()
 
 
-BrightRange = [np.min(df.bright), np.max(df.bright)]
-BrightVar = 40
+
+bright_range = [np.min(df.bright), np.max(df.bright)]
+bright_tolerance = 40
 
 mask = cv2.imread('mask.jpg')
-mask = cv2.resize(mask, (MaskSizeX, MaskSizeY))
-res = np.zeros(mask.shape, dtype=np.uint8)
+mask = cv2.resize(mask, (mask_size_x, mask_size_y))
+result = np.zeros(mask.shape, dtype=np.uint8)
 
-#_, mask = cv2.threshold(mask, 127,1,cv2.THRESH_BINARY)
+hex_region = get_hexagon_reg(im_size)
+coords = get_hexagon_mask_coordinates(im_size, mask_size_x, mask_size_y)
 
-alp = np.pi/6
-lhex = int(np.round(imsize/(1+2*np.sin(alp))))
-ri = int(np.round(imsize//2-np.cos(alp)*(imsize/(1+2*np.sin(alp)))))
-lres = int(np.round(lhex*np.sin(alp)))
-HexReg = get_hexagon_reg(imsize)
+print(str(i) + ' Source images,' + str(len(coords)) + ' Mask spots')
 
-Xrange1 = np.arange(0,MaskSizeX,imsize+lhex)
-Yrange1 = np.arange(0,MaskSizeY,imsize-2*ri)
-Coords1 = np.array([[x,y] for x in Xrange1 for y in Yrange1])
-Xrange2 = np.arange(lhex+lres,(MaskSizeX//(imsize+lhex))*(imsize+lhex)+lhex+lres,imsize+lhex)
-Yrange2 = np.arange(imsize//2-ri,(MaskSizeY//(imsize-2*ri))*(imsize-2*ri),imsize-2*ri)
-Coords2 = np.array([[x,y] for x in Xrange2 for y in Yrange2])
-Coords = np.concatenate((Coords1, Coords2), axis=0)
-
-print(str(i) + ' Source images,' + str(len(Coords)) + ' Mask spots')
-
-Maskdf = pd.DataFrame()
+mask_df = pd.DataFrame()
 
 
-for enu, (x,y) in enumerate(Coords):
-    Maskb = np.sum(mask[y:y+imsize,x:x+imsize,:])/(3*imsize**2*255)
-    c = BrightSelect(Maskb, df, BrightRange, BrightVar)
-    if(len(c) == 0):
+for i_spot, (x,y) in enumerate(coords):
+    mask_region_bright = np.sum(mask[y:y+im_size,x:x+im_size,:])/(3*im_size**2*255)
+    selected = bright_select(mask_region_bright, df, bright_range, bright_tolerance)
+    if(len(selected) == 0):
         print ('zero results')
-    e = c.loc[c.used == np.min(c.used)]
-    e = e.iloc[np.random.randint(len(e))]
-    im = cv2.imread(e.path)
-    imr = cv2.resize(im,(imsize, imsize))
-    for r, c in HexReg:
-        res[min(y+r, MaskSizeY-1),min(x+c,MaskSizeX-1),::-1] = imr[r,c,:]
-    a = 0
-    df.loc[df.path == e.path, 'used'] += 1
-    Maskdf.loc[enu, 'bright'] = Maskb
+    selected_min_used = selected.loc[selected.used == np.min(selected.used)]
+    selected = selected_min_used.iloc[np.random.randint(len(selected_min_used))]
+    im = cv2.imread(selected.path)
+    imr = cv2.resize(im,(im_size, im_size))
+    for r, c in hex_region:
+        result[min(y+r, mask_size_y-1),min(x+c,mask_size_x-1),::-1] = imr[r,c,:]
+    df.loc[df.path == selected.path, 'used'] += 1
+    mask_df.loc[i_spot, 'bright'] = mask_region_bright
 
 
 
@@ -88,10 +74,10 @@ print(str(len(c)))
 plt.figure()
 c.hist("bright")
 df.hist('bright')
-Maskdf.hist('bright')
+mask_df.hist('bright')
 plt.figure()
-cv2.imwrite("result.jpg", res[:,:,::-1])
-plt.imshow(res)
+cv2.imwrite("result.jpg", result[:,:,::-1])
+plt.imshow(result)
 
 plt.figure()
 plt.imshow(mask*255)
